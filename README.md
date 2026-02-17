@@ -112,3 +112,17 @@ Color mapping:
 - Helsinki: red
 - Espoo: blue
 - Vantaa: green
+
+## Visualize France tiles
+
+Render all z14 tiles inside the France country boundary as a single colored layer:
+
+```bash
+uv run python scripts/plot_france_tiles.py --output data/france_tiles.html
+```
+
+Ubuntu socket example:
+
+```bash
+DB_HOST= DB_PORT=5432 DB_USER="$USER" uv run python scripts/plot_france_tiles.py --output data/france_tiles.html
+```
