@@ -22,7 +22,7 @@ class DbConfig:
     db_name: str = os.getenv("DB_NAME", "osm_demo")
     db_host: str = os.getenv("DB_HOST", "localhost")
     db_port: int = int(os.getenv("DB_PORT", "5433"))
-    db_user: str = os.getenv("DB_USER", "postgres")
+    db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
 
     @property
     def dsn(self) -> str:

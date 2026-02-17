@@ -1,6 +1,6 @@
-# OSM z14 Tile -> City Assignment (Finland Demo)
+# OSM z14 Tile -> City Assignment
 
-Offline batch pipeline that imports Finland OSM data, builds z=14 Web Mercator tiles, and assigns exactly one city/place label per tile.
+Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator tiles, and assigns exactly one city/place label per tile.
 
 ## Stack
 
@@ -14,8 +14,9 @@ Offline batch pipeline that imports Finland OSM data, builds z=14 Web Mercator t
 - `DB_NAME=osm_demo`
 - `DB_HOST=localhost`
 - `DB_PORT=5433`
-- `DB_USER=postgres`
+- `DB_USER=$(whoami)`
 - `COUNTRY_NAME=Finland`
+- `COUNTRY_SLUG=finland`
 - `FALLBACK_RADIUS_M=7000`
 - `PBF_PATH=data/finland-latest.osm.pbf`
 
@@ -47,8 +48,27 @@ PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homeb
 ```
 
 Notes:
-- `make download` is idempotent and reuses `data/finland-latest.osm.pbf` if it already exists.
+- `make download` is idempotent and reuses `$(PBF_PATH)` if it already exists.
 - `make all` runs: setup, download, db-init, import, SQL build, validation.
+
+## Run For France
+
+One-command shortcut:
+
+```bash
+PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH" make france
+```
+
+Equivalent explicit command:
+
+```bash
+PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH" \
+  make all COUNTRY_NAME=France COUNTRY_SLUG=france
+```
+
+This uses:
+- `PBF_URL=https://download.geofabrik.de/europe/france-latest.osm.pbf`
+- `PBF_PATH=data/france-latest.osm.pbf`
 
 ## Key tables
 

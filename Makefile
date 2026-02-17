@@ -3,15 +3,16 @@ SHELL := /bin/zsh
 DB_NAME ?= osm_demo
 DB_HOST ?= localhost
 DB_PORT ?= 5433
-DB_USER ?= postgres
+DB_USER ?= $(shell whoami)
 COUNTRY_NAME ?= Finland
-PBF_URL ?= https://download.geofabrik.de/europe/finland-latest.osm.pbf
-PBF_PATH ?= data/finland-latest.osm.pbf
+COUNTRY_SLUG ?= finland
+PBF_URL ?= https://download.geofabrik.de/europe/$(COUNTRY_SLUG)-latest.osm.pbf
+PBF_PATH ?= data/$(COUNTRY_SLUG)-latest.osm.pbf
 FALLBACK_RADIUS_M ?= 7000
 
 PSQL = psql "postgresql://$(DB_USER)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
 
-.PHONY: help setup data-dir download db-init import sql-all build-country build-places build-tiles assign validate all
+.PHONY: help setup data-dir download db-init import sql-all build-country build-places build-tiles assign validate all france
 
 help:
 	@echo "Targets:"
@@ -70,3 +71,6 @@ validate:
 	uv run osm-tile-pipeline validate
 
 all: setup download db-init import sql-all validate
+
+france:
+	$(MAKE) all COUNTRY_NAME=France COUNTRY_SLUG=france

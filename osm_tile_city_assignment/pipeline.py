@@ -28,7 +28,7 @@ class Config:
     db_name: str = os.getenv("DB_NAME", "osm_demo")
     db_host: str = os.getenv("DB_HOST", "localhost")
     db_port: str = os.getenv("DB_PORT", "5432")
-    db_user: str = os.getenv("DB_USER", "postgres")
+    db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
     country_name: str = os.getenv("COUNTRY_NAME", "Finland")
     fallback_radius_m: str = os.getenv("FALLBACK_RADIUS_M", "7000")
 
