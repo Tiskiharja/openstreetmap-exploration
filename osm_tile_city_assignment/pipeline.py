@@ -27,21 +27,22 @@ RUN_ALL_ORDER = [
 class Config:
     db_name: str = os.getenv("DB_NAME", "osm_demo")
     db_host: str = os.getenv("DB_HOST", "localhost")
-    db_port: str = os.getenv("DB_PORT", "5432")
+    db_port: str = os.getenv("DB_PORT", "5433")
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
     country_name: str = os.getenv("COUNTRY_NAME", "Finland")
     fallback_radius_m: str = os.getenv("FALLBACK_RADIUS_M", "7000")
-
-    @property
-    def dsn(self) -> str:
-        return f"postgresql://{self.db_user}@{self.db_host}:{self.db_port}/{self.db_name}"
 
 
 def run_sql(stage: str, cfg: Config) -> None:
     sql_file = SQL_STAGES[stage]
     cmd = [
         "psql",
-        cfg.dsn,
+        "-U",
+        cfg.db_user,
+        "-p",
+        cfg.db_port,
+        "-d",
+        cfg.db_name,
         "-v",
         "ON_ERROR_STOP=1",
         "-v",
@@ -51,6 +52,8 @@ def run_sql(stage: str, cfg: Config) -> None:
         "-f",
         sql_file,
     ]
+    if cfg.db_host.strip():
+        cmd[1:1] = ["-h", cfg.db_host]
     print(f"\n==> Running stage: {stage} ({sql_file})")
     subprocess.run(cmd, check=True)
 

@@ -10,7 +10,18 @@ PBF_URL ?= https://download.geofabrik.de/europe/$(COUNTRY_SLUG)-latest.osm.pbf
 PBF_PATH ?= data/$(COUNTRY_SLUG)-latest.osm.pbf
 FALLBACK_RADIUS_M ?= 7000
 
-PSQL = psql "postgresql://$(DB_USER)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)"
+PSQL_ARGS = -U $(DB_USER) -p $(DB_PORT) -d $(DB_NAME)
+OSM2PGSQL_ARGS = \
+	  --database $(DB_NAME) \
+	  --port $(DB_PORT) \
+	  --username $(DB_USER)
+
+ifneq ($(strip $(DB_HOST)),)
+PSQL_ARGS += -h $(DB_HOST)
+OSM2PGSQL_ARGS += --host $(DB_HOST)
+endif
+
+PSQL = psql $(PSQL_ARGS)
 
 .PHONY: help setup data-dir download db-init import sql-all build-country build-places build-tiles assign validate all france
 
@@ -42,10 +53,7 @@ db-init:
 
 import:
 	osm2pgsql \
-	  --database $(DB_NAME) \
-	  --host $(DB_HOST) \
-	  --port $(DB_PORT) \
-	  --username $(DB_USER) \
+	  $(OSM2PGSQL_ARGS) \
 	  --create \
 	  --slim \
 	  --merc \

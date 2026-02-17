@@ -38,6 +38,7 @@ createdb -h localhost -p 5433 -U postgres osm_demo
 Configuration:
 - Use environment variables (`DB_NAME`, `DB_HOST`, `DB_PORT`, `DB_USER`) for local settings.
 - `.env.example` is safe to commit; keep real credentials in a local `.env` (ignored by git).
+- To use Unix socket auth (common on Ubuntu), set `DB_HOST` to empty: `DB_HOST=`.
 
 ## Run
 
@@ -69,6 +70,12 @@ PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homeb
 This uses:
 - `PBF_URL=https://download.geofabrik.de/europe/france-latest.osm.pbf`
 - `PBF_PATH=data/france-latest.osm.pbf`
+
+Ubuntu socket example:
+
+```bash
+make france DB_HOST= DB_PORT=5432 DB_USER="$USER"
+```
 
 ## Key tables
 

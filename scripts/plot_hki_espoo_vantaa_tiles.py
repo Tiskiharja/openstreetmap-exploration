@@ -25,8 +25,15 @@ class DbConfig:
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
 
     @property
-    def dsn(self) -> str:
-        return f"postgresql://{self.db_user}@{self.db_host}:{self.db_port}/{self.db_name}"
+    def connect_kwargs(self) -> dict[str, str | int]:
+        kwargs: dict[str, str | int] = {
+            "dbname": self.db_name,
+            "user": self.db_user,
+            "port": self.db_port,
+        }
+        if self.db_host.strip():
+            kwargs["host"] = self.db_host
+        return kwargs
 
 
 def _iter_coords(geometry: dict):
@@ -157,9 +164,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    dsn = args.dsn or DbConfig().dsn
+    cfg = DbConfig()
 
-    with psycopg.connect(dsn) as conn:
+    if args.dsn:
+        conn_ctx = psycopg.connect(args.dsn)
+    else:
+        conn_ctx = psycopg.connect(**cfg.connect_kwargs)
+
+    with conn_ctx as conn:
         features = fetch_features(conn)
         if not features:
             raise RuntimeError(
