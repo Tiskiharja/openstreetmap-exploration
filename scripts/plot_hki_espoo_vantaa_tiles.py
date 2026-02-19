@@ -15,6 +15,7 @@ CITY_COLORS = {
     "Espoo": "#1f78b4",
     "Vantaa": "#33a02c",
 }
+TARGET_CITIES = tuple(CITY_COLORS.keys())
 
 
 @dataclass(frozen=True)
@@ -70,14 +71,32 @@ def compute_bounds(features: list[dict]) -> tuple[float, float, float, float] | 
 
 def fetch_features(conn: psycopg.Connection) -> list[dict]:
     sql = """
-        WITH city_boundaries AS (
+        WITH target_cities AS (
+            SELECT * FROM (VALUES ('Helsinki'), ('Espoo'), ('Vantaa')) AS t(city_name)
+        ),
+        matched_boundaries AS (
             SELECT
-                name AS city_name,
-                way::geometry(MultiPolygon, 3857) AS geom
-            FROM public.planet_osm_polygon
-            WHERE boundary = 'administrative'
-              AND admin_level = '8'
-              AND name IN ('Helsinki', 'Espoo', 'Vantaa')
+                tc.city_name,
+                p.way::geometry(MultiPolygon, 3857) AS geom,
+                ROW_NUMBER() OVER (
+                    PARTITION BY tc.city_name
+                    ORDER BY ST_Area(p.way::geometry) DESC
+                ) AS rn
+            FROM public.planet_osm_polygon p
+            JOIN target_cities tc
+              ON (
+                  p.name = tc.city_name
+                  OR p.tags->'name:fi' = tc.city_name
+                  OR p.tags->'name:sv' = tc.city_name
+                  OR p.tags->'name:en' = tc.city_name
+              )
+            WHERE p.boundary = 'administrative'
+              AND p.admin_level IN ('7', '8')
+        ),
+        city_boundaries AS (
+            SELECT city_name, geom
+            FROM matched_boundaries
+            WHERE rn = 1
         )
         SELECT
             t.z,
@@ -110,6 +129,14 @@ def fetch_features(conn: psycopg.Connection) -> list[dict]:
             }
         )
     return features
+
+
+def fetch_loaded_country_name(conn: psycopg.Connection) -> str | None:
+    sql = "SELECT name FROM demo.country_boundary LIMIT 1"
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        row = cur.fetchone()
+    return row[0] if row and row[0] else None
 
 
 def build_map(features: list[dict], bounds: tuple[float, float, float, float] | None) -> folium.Map:
@@ -174,8 +201,11 @@ def main() -> int:
     with conn_ctx as conn:
         features = fetch_features(conn)
         if not features:
+            country_name = fetch_loaded_country_name(conn)
+            country_suffix = f" Loaded country_boundary is '{country_name}'." if country_name else ""
             raise RuntimeError(
-                "No municipality tiles found for Helsinki/Espoo/Vantaa."
+                f"No municipality tiles found for {', '.join(TARGET_CITIES)}.{country_suffix}"
+                " Make sure Finland data is imported before running this script."
             )
         bounds = compute_bounds(features)
 
