@@ -2,6 +2,8 @@
 
 Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator tiles, and assigns exactly one city/place label per tile.
 
+Code in this repo is mostly vibe-coded. The goal has been for me to get familiar with working with OSM data. 
+
 ## Published Docs
 
 - [Docs hub](data/index.html)
