@@ -73,10 +73,13 @@ This uses:
 
 ## Key tables
 
-- `demo.country_boundary`
-- `demo.place_points`
+- `demo.countries` (persistent, one row per `COUNTRY_SLUG`)
 - `demo.tiles_z14`
 - `demo.tile_city_z14`
+- `demo.stg_country_boundary` (temporary, overwritten per run)
+- `demo.stg_place_points` (temporary, overwritten per run)
+- `demo.stg_tiles_z14` (temporary, overwritten per run)
+- `demo.stg_tile_city_z14` (temporary, overwritten per run)
 
 ## Assignment order (deterministic)
 

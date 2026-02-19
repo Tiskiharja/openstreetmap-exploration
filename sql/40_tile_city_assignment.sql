@@ -1,8 +1,8 @@
 \set ON_ERROR_STOP on
 
-DROP TABLE IF EXISTS demo.tile_city_z14;
+DROP TABLE IF EXISTS demo.stg_tile_city_z14;
 
-CREATE TABLE demo.tile_city_z14 (
+CREATE TABLE demo.stg_tile_city_z14 (
     z int NOT NULL,
     x int NOT NULL,
     y int NOT NULL,
@@ -26,8 +26,8 @@ WITH tier1_ranked AS (
             PARTITION BY t.z, t.x, t.y
             ORDER BY p.place_rank ASC, p.population DESC NULLS LAST, p.osm_id ASC
         ) AS rn
-    FROM demo.tiles_z14 t
-    JOIN demo.place_points p
+    FROM demo.stg_tiles_z14 t
+    JOIN demo.stg_place_points p
       ON ST_Contains(t.geom, p.geom)
 ), tier1 AS (
     SELECT
@@ -47,7 +47,7 @@ WITH tier1_ranked AS (
         t.x,
         t.y,
         t.centroid
-    FROM demo.tiles_z14 t
+    FROM demo.stg_tiles_z14 t
     LEFT JOIN tier1 a
       ON t.z = a.z AND t.x = a.x AND t.y = a.y
     WHERE a.z IS NULL
@@ -68,7 +68,7 @@ WITH tier1_ranked AS (
                      p.osm_id ASC
         ) AS rn
     FROM unassigned u
-    JOIN demo.place_points p
+    JOIN demo.stg_place_points p
       ON ST_DWithin(u.centroid, p.geom, :'fallback_radius_m'::double precision)
 ), tier2_in_radius AS (
     SELECT
@@ -111,7 +111,7 @@ WITH tier1_ranked AS (
             pp.place_rank,
             pp.population,
             ST_Distance(s.centroid, pp.geom) AS distance_m
-        FROM demo.place_points pp
+        FROM demo.stg_place_points pp
         ORDER BY pp.place_rank ASC,
                  ST_Distance(s.centroid, pp.geom) ASC,
                  pp.population DESC NULLS LAST,
@@ -125,7 +125,7 @@ WITH tier1_ranked AS (
     UNION ALL
     SELECT z, x, y, osm_id, name, place, distance_m, assignment_method FROM tier2_unbounded
 )
-INSERT INTO demo.tile_city_z14 (
+INSERT INTO demo.stg_tile_city_z14 (
     z,
     x,
     y,
@@ -148,7 +148,37 @@ FROM final_rows;
 
 DO $$
 BEGIN
-    IF (SELECT COUNT(*) FROM demo.tiles_z14) <> (SELECT COUNT(*) FROM demo.tile_city_z14) THEN
+    IF (SELECT COUNT(*) FROM demo.stg_tiles_z14) <> (SELECT COUNT(*) FROM demo.stg_tile_city_z14) THEN
         RAISE EXCEPTION 'Assignment row count does not match tile count';
     END IF;
 END $$;
+
+DELETE FROM demo.tile_city_z14 tc
+USING demo.countries c
+WHERE tc.country_id = c.id
+  AND c.slug = :'country_slug';
+
+INSERT INTO demo.tile_city_z14 (
+    country_id,
+    z,
+    x,
+    y,
+    city_osm_id,
+    city_name,
+    place_type,
+    distance_m,
+    assignment_method
+)
+SELECT
+    c.id AS country_id,
+    s.z,
+    s.x,
+    s.y,
+    s.city_osm_id,
+    s.city_name,
+    s.place_type,
+    s.distance_m,
+    s.assignment_method
+FROM demo.stg_tile_city_z14 s
+JOIN demo.countries c
+  ON c.slug = :'country_slug';

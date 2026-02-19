@@ -1,8 +1,8 @@
 \set ON_ERROR_STOP on
 
-DROP TABLE IF EXISTS demo.country_boundary;
+DROP TABLE IF EXISTS demo.stg_country_boundary;
 
-CREATE TABLE demo.country_boundary AS
+CREATE TABLE demo.stg_country_boundary AS
 WITH candidates AS (
     SELECT
         osm_id,
@@ -31,17 +31,32 @@ SELECT
 FROM ranked
 WHERE rn = 1;
 
-ALTER TABLE demo.country_boundary
+ALTER TABLE demo.stg_country_boundary
     ALTER COLUMN geom SET NOT NULL;
 
-CREATE INDEX country_boundary_geom_gix ON demo.country_boundary USING GIST (geom);
+CREATE INDEX stg_country_boundary_geom_gix ON demo.stg_country_boundary USING GIST (geom);
 
 DO $$
 DECLARE
     boundary_count int;
 BEGIN
-    SELECT COUNT(*) INTO boundary_count FROM demo.country_boundary;
+    SELECT COUNT(*) INTO boundary_count FROM demo.stg_country_boundary;
     IF boundary_count <> 1 THEN
         RAISE EXCEPTION 'Expected exactly one country boundary match; found %', boundary_count;
     END IF;
 END $$;
+
+INSERT INTO demo.countries (slug, osm_id, name, geom, updated_at)
+SELECT
+    :'country_slug',
+    osm_id,
+    name,
+    geom,
+    now()
+FROM demo.stg_country_boundary
+ON CONFLICT (slug) DO UPDATE
+SET
+    osm_id = EXCLUDED.osm_id,
+    name = EXCLUDED.name,
+    geom = EXCLUDED.geom,
+    updated_at = now();

@@ -24,6 +24,7 @@ class DbConfig:
     db_host: str = os.getenv("DB_HOST", "")
     db_port: int = int(os.getenv("DB_PORT", "5433"))
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
+    country_slug: str = os.getenv("COUNTRY_SLUG", "finland")
 
     @property
     def connect_kwargs(self) -> dict[str, str | int]:
@@ -69,29 +70,35 @@ def compute_bounds(features: list[dict]) -> tuple[float, float, float, float] | 
     return min_lon, min_lat, max_lon, max_lat
 
 
-def fetch_features(conn: psycopg.Connection) -> list[dict]:
+def fetch_features(conn: psycopg.Connection, country_slug: str) -> list[dict]:
     sql = """
         WITH target_cities AS (
             SELECT * FROM (VALUES ('Helsinki'), ('Espoo'), ('Vantaa')) AS t(city_name)
         ),
+        target_country AS (
+            SELECT id
+            FROM demo.countries
+            WHERE slug = %(country_slug)s
+            LIMIT 1
+        ),
         matched_boundaries AS (
             SELECT
                 tc.city_name,
-                p.way::geometry(MultiPolygon, 3857) AS geom,
+                ab.geom,
                 ROW_NUMBER() OVER (
                     PARTITION BY tc.city_name
-                    ORDER BY ST_Area(p.way::geometry) DESC
+                    ORDER BY ST_Area(ab.geom) DESC, ab.osm_id ASC
                 ) AS rn
-            FROM public.planet_osm_polygon p
+            FROM demo.admin_boundaries ab
+            JOIN target_country c
+              ON c.id = ab.country_id
             JOIN target_cities tc
               ON (
-                  p.name = tc.city_name
-                  OR p.tags->'name:fi' = tc.city_name
-                  OR p.tags->'name:sv' = tc.city_name
-                  OR p.tags->'name:en' = tc.city_name
+                  ab.name = tc.city_name
+                  OR ab.name_fi = tc.city_name
+                  OR ab.name_sv = tc.city_name
+                  OR ab.name_en = tc.city_name
               )
-            WHERE p.boundary = 'administrative'
-              AND p.admin_level IN ('7', '8')
         ),
         city_boundaries AS (
             SELECT city_name, geom
@@ -105,12 +112,14 @@ def fetch_features(conn: psycopg.Connection) -> list[dict]:
             b.city_name,
             ST_AsGeoJSON(ST_Transform(t.geom, 4326)) AS geom_geojson
         FROM demo.tiles_z14 t
+        JOIN target_country c
+          ON c.id = t.country_id
         JOIN city_boundaries b
           ON ST_Covers(b.geom, t.centroid)
         ORDER BY b.city_name, t.x, t.y
     """
     with conn.cursor() as cur:
-        cur.execute(sql)
+        cur.execute(sql, {"country_slug": country_slug})
         rows = cur.fetchall()
 
     features: list[dict] = []
@@ -132,7 +141,7 @@ def fetch_features(conn: psycopg.Connection) -> list[dict]:
 
 
 def fetch_loaded_country_name(conn: psycopg.Connection) -> str | None:
-    sql = "SELECT name FROM demo.country_boundary LIMIT 1"
+    sql = "SELECT name FROM demo.countries ORDER BY updated_at DESC, id DESC LIMIT 1"
     with conn.cursor() as cur:
         cur.execute(sql)
         row = cur.fetchone()
@@ -186,6 +195,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional full PostgreSQL DSN. If omitted, DB_* environment variables are used.",
     )
+    parser.add_argument(
+        "--country-slug",
+        default=None,
+        help="Country slug from demo.countries to read tiles from (default: COUNTRY_SLUG or finland).",
+    )
     return parser.parse_args()
 
 
@@ -198,14 +212,15 @@ def main() -> int:
     else:
         conn_ctx = psycopg.connect(**cfg.connect_kwargs)
 
+    country_slug = args.country_slug or cfg.country_slug
     with conn_ctx as conn:
-        features = fetch_features(conn)
+        features = fetch_features(conn, country_slug=country_slug)
         if not features:
             country_name = fetch_loaded_country_name(conn)
-            country_suffix = f" Loaded country_boundary is '{country_name}'." if country_name else ""
+            country_suffix = f" Most recently updated country is '{country_name}'." if country_name else ""
             raise RuntimeError(
-                f"No municipality tiles found for {', '.join(TARGET_CITIES)}.{country_suffix}"
-                " Make sure Finland data is imported before running this script."
+                f"No municipality tiles found for {', '.join(TARGET_CITIES)} in country_slug={country_slug!r}.{country_suffix}"
+                " Make sure the selected country has those city assignments."
             )
         bounds = compute_bounds(features)
 

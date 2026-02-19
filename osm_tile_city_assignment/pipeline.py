@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 SQL_STAGES = {
     "extensions": "sql/00_extensions.sql",
+    "persistent-schema": "sql/05_persistent_tables.sql",
     "build-country": "sql/10_country_boundary.sql",
     "build-places": "sql/20_place_points.sql",
     "build-tiles": "sql/30_tiles_z14.sql",
@@ -16,6 +17,7 @@ SQL_STAGES = {
 
 RUN_ALL_ORDER = [
     "extensions",
+    "persistent-schema",
     "build-country",
     "build-places",
     "build-tiles",
@@ -30,6 +32,7 @@ class Config:
     db_port: str = os.getenv("DB_PORT", "5433")
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
     country_name: str = os.getenv("COUNTRY_NAME", "Finland")
+    country_slug: str = os.getenv("COUNTRY_SLUG", "finland")
     fallback_radius_m: str = os.getenv("FALLBACK_RADIUS_M", "7000")
 
 
@@ -47,6 +50,8 @@ def run_sql(stage: str, cfg: Config) -> None:
         "ON_ERROR_STOP=1",
         "-v",
         f"country_name={cfg.country_name}",
+        "-v",
+        f"country_slug={cfg.country_slug}",
         "-v",
         f"fallback_radius_m={cfg.fallback_radius_m}",
         "-f",

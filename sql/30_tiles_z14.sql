@@ -20,12 +20,12 @@ AS $$
     )::int;
 $$;
 
-DROP TABLE IF EXISTS demo.tiles_z14;
+DROP TABLE IF EXISTS demo.stg_tiles_z14;
 
-CREATE TABLE demo.tiles_z14 AS
+CREATE TABLE demo.stg_tiles_z14 AS
 WITH bbox AS (
     SELECT ST_Transform(ST_Envelope(geom), 4326) AS geom
-    FROM demo.country_boundary
+    FROM demo.stg_country_boundary
 ), raw_ranges AS (
     SELECT
         demo.lon_to_tile_x(ST_XMin(geom), 14) AS x_a,
@@ -57,11 +57,28 @@ SELECT
     c.geom,
     ST_Centroid(c.geom)::geometry(Point, 3857) AS centroid
 FROM candidates c
-JOIN demo.country_boundary cb
+JOIN demo.stg_country_boundary cb
   ON ST_Intersects(c.geom, cb.geom);
 
-ALTER TABLE demo.tiles_z14
-    ADD CONSTRAINT tiles_z14_pk PRIMARY KEY (z, x, y);
+ALTER TABLE demo.stg_tiles_z14
+    ADD CONSTRAINT stg_tiles_z14_pk PRIMARY KEY (z, x, y);
 
-CREATE INDEX tiles_z14_geom_gix ON demo.tiles_z14 USING GIST (geom);
-CREATE INDEX tiles_z14_centroid_gix ON demo.tiles_z14 USING GIST (centroid);
+CREATE INDEX stg_tiles_z14_geom_gix ON demo.stg_tiles_z14 USING GIST (geom);
+CREATE INDEX stg_tiles_z14_centroid_gix ON demo.stg_tiles_z14 USING GIST (centroid);
+
+DELETE FROM demo.tiles_z14 t
+USING demo.countries c
+WHERE t.country_id = c.id
+  AND c.slug = :'country_slug';
+
+INSERT INTO demo.tiles_z14 (country_id, z, x, y, geom, centroid)
+SELECT
+    c.id AS country_id,
+    t.z,
+    t.x,
+    t.y,
+    t.geom,
+    t.centroid
+FROM demo.stg_tiles_z14 t
+JOIN demo.countries c
+  ON c.slug = :'country_slug';

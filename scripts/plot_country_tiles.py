@@ -64,8 +64,8 @@ def compute_bounds(features: list[dict]) -> tuple[float, float, float, float] | 
 def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
     sql = """
         WITH target_country AS (
-            SELECT geom
-            FROM demo.country_boundary
+            SELECT id, geom
+            FROM demo.countries
             WHERE name ILIKE %(country_name)s
             LIMIT 1
         )
@@ -78,9 +78,14 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
             tc.assignment_method,
             ST_AsGeoJSON(ST_Transform(t.geom, 4326)) AS geom_geojson
         FROM demo.tiles_z14 t
-        JOIN demo.tile_city_z14 tc USING (z, x, y)
+        JOIN demo.tile_city_z14 tc
+          ON tc.country_id = t.country_id
+         AND tc.z = t.z
+         AND tc.x = t.x
+         AND tc.y = t.y
         JOIN target_country c
-          ON ST_Covers(c.geom, t.centroid)
+          ON c.id = t.country_id
+         AND ST_Covers(c.geom, t.centroid)
         ORDER BY t.x, t.y
     """
     with conn.cursor() as cur:
@@ -109,8 +114,8 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
 def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list[dict]:
     sql = """
         WITH target_country AS (
-            SELECT geom
-            FROM demo.country_boundary
+            SELECT id, geom
+            FROM demo.countries
             WHERE name ILIKE %(country_name)s
             LIMIT 1
         ),
@@ -118,7 +123,8 @@ def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list
             SELECT t.geom
             FROM demo.tiles_z14 t
             JOIN target_country c
-              ON ST_Covers(c.geom, t.centroid)
+              ON c.id = t.country_id
+             AND ST_Covers(c.geom, t.centroid)
         )
         SELECT ST_AsGeoJSON(
             ST_Transform(
@@ -195,7 +201,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--country-name",
         required=True,
-        help="Country boundary name to match in demo.country_boundary (required).",
+        help="Country name to match in demo.countries (required).",
     )
     parser.add_argument(
         "--output",
@@ -245,7 +251,7 @@ def main() -> int:
             features = fetch_features(conn, country_name=args.country_name)
         if not features:
             raise RuntimeError(
-                f"No tiles found for country_name={args.country_name!r} in demo.country_boundary/demo.tiles_z14."
+                f"No tiles found for country_name={args.country_name!r} in demo.countries/demo.tiles_z14."
             )
         bounds = compute_bounds(features)
 
