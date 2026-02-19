@@ -13,6 +13,8 @@ SQL_STAGES = {
     "build-tiles": "sql/30_tiles_z14.sql",
     "assign": "sql/40_tile_city_assignment.sql",
     "validate": "sql/50_validation.sql",
+    "area-summary": "sql/60_country_tile_area_summary.sql",
+    "area-summary-geodesic": "sql/61_country_tile_area_summary_geodesic.sql",
 }
 
 RUN_ALL_ORDER = [
@@ -22,6 +24,7 @@ RUN_ALL_ORDER = [
     "build-places",
     "build-tiles",
     "assign",
+    "area-summary",
 ]
 
 
@@ -69,6 +72,8 @@ def usage() -> int:
         "  uv run osm-tile-pipeline run-all\n"
         "  uv run osm-tile-pipeline run <stage>\n"
         "  uv run osm-tile-pipeline validate\n"
+        "  uv run osm-tile-pipeline area-summary\n"
+        "  uv run osm-tile-pipeline area-summary-geodesic\n"
         f"Stages: {', '.join(k for k in SQL_STAGES if k != 'validate')}"
     )
     return 2
@@ -97,6 +102,14 @@ def main() -> None:
 
     if command == "validate":
         run_sql("validate", cfg)
+        return
+
+    if command == "area-summary":
+        run_sql("area-summary", cfg)
+        return
+
+    if command == "area-summary-geodesic":
+        run_sql("area-summary-geodesic", cfg)
         return
 
     raise SystemExit(usage())
