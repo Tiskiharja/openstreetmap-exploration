@@ -2,6 +2,14 @@
 
 Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator tiles, and assigns exactly one city/place label per tile.
 
+## Published Docs
+
+- [Docs hub](data/index.html)
+- [Area analysis summary](AREA_ANALYSIS.md)
+- [Finland tiles](data/finland_tiles.html)
+- [France tiles](data/france_tiles.html)
+- [Helsinki / Espoo / Vantaa tiles](data/helsinki_espoo_vantaa_tiles.html)
+
 ## Stack
 
 - PostgreSQL 16 + PostGIS
