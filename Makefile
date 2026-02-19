@@ -1,7 +1,7 @@
 SHELL := /bin/zsh
 
 DB_NAME ?= osm_demo
-DB_HOST ?= localhost
+DB_HOST ?= 
 DB_PORT ?= 5433
 DB_USER ?= $(shell whoami)
 COUNTRY_NAME ?= Finland
@@ -13,8 +13,8 @@ FALLBACK_RADIUS_M ?= 7000
 PSQL_ARGS = -U $(DB_USER) -p $(DB_PORT) -d $(DB_NAME)
 OSM2PGSQL_ARGS = \
 	  --database $(DB_NAME) \
-	  --port $(DB_PORT) \
-	  --username $(DB_USER)
+	  --port $(DB_PORT) # \
+	  # --username $(DB_USER)
 
 ifneq ($(strip $(DB_HOST)),)
 PSQL_ARGS += -h $(DB_HOST)

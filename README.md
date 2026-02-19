@@ -12,7 +12,7 @@ Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator t
 ## Defaults (from `Makefile`)
 
 - `DB_NAME=osm_demo`
-- `DB_HOST=localhost`
+- `DB_HOST=` (empty = Unix socket mode)
 - `DB_PORT=5433`
 - `DB_USER=$(whoami)`
 - `COUNTRY_NAME=Finland`
@@ -32,13 +32,13 @@ Start PostgreSQL 17 (example on port 5433):
 
 ```bash
 /opt/homebrew/opt/postgresql@17/bin/pg_ctl -D /opt/homebrew/var/postgresql@17 -l /tmp/postgresql17.log -o "-p 5433" start
-createdb -h localhost -p 5433 -U postgres osm_demo
+createdb -p 5433 -U postgres osm_demo
 ```
 
 Configuration:
 - Use environment variables (`DB_NAME`, `DB_HOST`, `DB_PORT`, `DB_USER`) for local settings.
 - `.env.example` is safe to commit; keep real credentials in a local `.env` (ignored by git).
-- To use Unix socket auth (common on Ubuntu), set `DB_HOST` to empty: `DB_HOST=`.
+- Unix socket auth is the default: leave `DB_HOST` empty (`DB_HOST=`).
 
 ## Run
 
@@ -70,12 +70,6 @@ PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homeb
 This uses:
 - `PBF_URL=https://download.geofabrik.de/europe/france-latest.osm.pbf`
 - `PBF_PATH=data/france-latest.osm.pbf`
-
-Ubuntu socket example:
-
-```bash
-make france DB_HOST= DB_PORT=5432 DB_USER="$USER"
-```
 
 ## Key tables
 
@@ -113,16 +107,10 @@ Color mapping:
 - Espoo: blue
 - Vantaa: green
 
-## Visualize France tiles
+## Visualize country tiles
 
-Render all z14 tiles inside the France country boundary as a single colored layer:
-
-```bash
-uv run python scripts/plot_france_tiles.py --output data/france_tiles.html
-```
-
-Ubuntu socket example:
+Render all z14 tiles inside a country boundary as a single colored layer:
 
 ```bash
-DB_HOST= DB_PORT=5432 DB_USER="$USER" uv run python scripts/plot_france_tiles.py --output data/france_tiles.html
+uv run python scripts/plot_country_tiles.py --country-name "Suomi / Finland" --output data/finland_tiles.html
 ```

@@ -13,7 +13,7 @@ import psycopg
 @dataclass(frozen=True)
 class DbConfig:
     db_name: str = os.getenv("DB_NAME", "osm_demo")
-    db_host: str = os.getenv("DB_HOST", "localhost")
+    db_host: str = os.getenv("DB_HOST", "")
     db_port: int = int(os.getenv("DB_PORT", "5433"))
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
 
@@ -106,11 +106,48 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
     return features
 
 
+def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list[dict]:
+    sql = """
+        WITH target_country AS (
+            SELECT geom
+            FROM demo.country_boundary
+            WHERE name ILIKE %(country_name)s
+            LIMIT 1
+        ),
+        selected_tiles AS (
+            SELECT t.geom
+            FROM demo.tiles_z14 t
+            JOIN target_country c
+              ON ST_Covers(c.geom, t.centroid)
+        )
+        SELECT ST_AsGeoJSON(
+            ST_Transform(
+                ST_UnaryUnion(ST_Collect(geom)),
+                4326
+            )
+        ) AS geom_geojson
+        FROM selected_tiles
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, {"country_name": country_name})
+        row = cur.fetchone()
+    if not row or not row[0]:
+        return []
+    return [
+        {
+            "type": "Feature",
+            "properties": {"country_name": country_name},
+            "geometry": json.loads(row[0]),
+        }
+    ]
+
+
 def build_map(
     features: list[dict],
     bounds: tuple[float, float, float, float] | None,
     fill_color: str,
     fill_opacity: float,
+    show_tooltip: bool,
 ) -> folium.Map:
     if bounds is not None:
         min_lon, min_lat, max_lon, max_lat = bounds
@@ -120,6 +157,13 @@ def build_map(
 
     m = folium.Map(location=center, zoom_start=6, tiles="CartoDB positron")
     geojson = {"type": "FeatureCollection", "features": features}
+
+    tooltip = None
+    if show_tooltip:
+        tooltip = folium.GeoJsonTooltip(
+            fields=["city_name", "place_type", "assignment_method", "z", "x", "y"],
+            aliases=["Assigned city", "Place type", "Method", "Z", "X", "Y"],
+        )
 
     layer = folium.GeoJson(
         data=geojson,
@@ -131,11 +175,8 @@ def build_map(
             "opacity": 0.7,
             "fillOpacity": fill_opacity,
         },
-        tooltip=folium.GeoJsonTooltip(
-            fields=["city_name", "place_type", "assignment_method", "z", "x", "y"],
-            aliases=["Assigned city", "Place type", "Method", "Z", "X", "Y"],
-        ),
-        name="France tiles",
+        tooltip=tooltip,
+        name="Country tiles",
     )
     layer.add_to(m)
     folium.LayerControl(collapsed=False).add_to(m)
@@ -149,17 +190,17 @@ def build_map(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Render all z14 tiles mapped to France into an interactive HTML map."
+        description="Render z14 tiles for a country into an interactive HTML map."
     )
     parser.add_argument(
         "--country-name",
-        default="France",
-        help="Country boundary name to match in demo.country_boundary (default: France).",
+        required=True,
+        help="Country boundary name to match in demo.country_boundary (required).",
     )
     parser.add_argument(
         "--output",
-        default="data/france_tiles.html",
-        help="Output HTML map path (default: data/france_tiles.html).",
+        default="data/country_tiles.html",
+        help="Output HTML map path (default: data/country_tiles.html).",
     )
     parser.add_argument(
         "--fill-color",
@@ -177,6 +218,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional PostgreSQL DSN. If omitted, DB_* environment variables are used.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=["tiles", "dissolved"],
+        default="tiles",
+        help="Output mode: per-tile polygons (tiles) or one merged polygon (dissolved).",
+    )
     return parser.parse_args()
 
 
@@ -192,7 +239,10 @@ def main() -> int:
         conn_ctx = psycopg.connect(**cfg.connect_kwargs)
 
     with conn_ctx as conn:
-        features = fetch_features(conn, country_name=args.country_name)
+        if args.mode == "dissolved":
+            features = fetch_dissolved_feature(conn, country_name=args.country_name)
+        else:
+            features = fetch_features(conn, country_name=args.country_name)
         if not features:
             raise RuntimeError(
                 f"No tiles found for country_name={args.country_name!r} in demo.country_boundary/demo.tiles_z14."
@@ -204,6 +254,7 @@ def main() -> int:
         bounds=bounds,
         fill_color=args.fill_color,
         fill_opacity=args.fill_opacity,
+        show_tooltip=(args.mode == "tiles"),
     )
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     m.save(args.output)

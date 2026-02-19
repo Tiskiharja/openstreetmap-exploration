@@ -20,7 +20,7 @@ CITY_COLORS = {
 @dataclass(frozen=True)
 class DbConfig:
     db_name: str = os.getenv("DB_NAME", "osm_demo")
-    db_host: str = os.getenv("DB_HOST", "localhost")
+    db_host: str = os.getenv("DB_HOST", "")
     db_port: int = int(os.getenv("DB_PORT", "5433"))
     db_user: str = os.getenv("DB_USER", os.getenv("USER", "postgres"))
 
