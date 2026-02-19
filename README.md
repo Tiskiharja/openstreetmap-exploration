@@ -4,10 +4,12 @@ Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator t
 
 ## Stack
 
-- PostgreSQL 17 + PostGIS
+- PostgreSQL 16 + PostGIS
 - osm2pgsql
 - uv
 - curl
+
+The pipeline is platform-agnostic and can run on macOS or Linux as long as these tools are installed and available on `PATH`.
 
 ## Defaults (from `Makefile`)
 
@@ -22,16 +24,9 @@ Offline batch pipeline that imports OSM country data, builds z=14 Web Mercator t
 
 ## One-time setup
 
-Install required tools (Homebrew):
+Install the required tools using your platform package manager, then start PostgreSQL and create the database:
 
 ```bash
-brew install libpq osm2pgsql postgis postgresql@17
-```
-
-Start PostgreSQL 17 (example on port 5433):
-
-```bash
-/opt/homebrew/opt/postgresql@17/bin/pg_ctl -D /opt/homebrew/var/postgresql@17 -l /tmp/postgresql17.log -o "-p 5433" start
 createdb -p 5433 -U postgres osm_demo
 ```
 
@@ -42,10 +37,10 @@ Configuration:
 
 ## Run
 
-Use PATH so `psql`/`osm2pgsql` resolve:
+Ensure `psql` and `osm2pgsql` are on `PATH`, then run:
 
 ```bash
-PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH" make all
+make all
 ```
 
 Notes:
@@ -57,14 +52,13 @@ Notes:
 One-command shortcut:
 
 ```bash
-PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH" make france
+make france
 ```
 
 Equivalent explicit command:
 
 ```bash
-PATH="/opt/homebrew/opt/postgresql@17/bin:/opt/homebrew/opt/libpq/bin:/opt/homebrew/bin:$PATH" \
-  make all COUNTRY_NAME=France COUNTRY_SLUG=france
+make all COUNTRY_NAME=France COUNTRY_SLUG=france
 ```
 
 This uses:
