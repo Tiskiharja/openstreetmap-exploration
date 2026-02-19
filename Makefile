@@ -23,7 +23,7 @@ endif
 
 PSQL = psql $(PSQL_ARGS)
 
-.PHONY: help setup data-dir download db-init import sql-all build-country build-places build-tiles assign validate all france
+.PHONY: help setup data-dir download db-init import sql-all build-country build-places build-tiles assign area-summary area-summary-geodesic validate all france
 
 help:
 	@echo "Targets:"
@@ -32,6 +32,8 @@ help:
 	@echo "  db-init      - Enable required extensions"
 	@echo "  import       - Import PBF via osm2pgsql (classic schema)"
 	@echo "  sql-all      - Run all SQL stages"
+	@echo "  area-summary - Build country tile area summary view"
+	@echo "  area-summary-geodesic - Build country tile area summary geodesic view (slower)"
 	@echo "  validate     - Run validation queries"
 	@echo "  all          - setup + download + db-init + import + sql-all + validate"
 
@@ -74,6 +76,12 @@ build-tiles:
 
 assign:
 	uv run osm-tile-pipeline run assign
+
+area-summary:
+	uv run osm-tile-pipeline area-summary
+
+area-summary-geodesic:
+	uv run osm-tile-pipeline area-summary-geodesic
 
 validate:
 	uv run osm-tile-pipeline validate
