@@ -22,6 +22,30 @@ WHERE country_id = :id
 GROUP BY assignment_method
 ORDER BY cnt DESC;
 
+\echo '=== Tile class distribution ==='
+SELECT
+    tile_class,
+    COUNT(*) AS cnt,
+    ROUND(AVG(land_sample_ratio)::numeric, 4) AS avg_land_sample_ratio
+FROM demo.tiles_z14
+WHERE country_id = :id
+GROUP BY tile_class
+ORDER BY cnt DESC, tile_class ASC;
+
+\echo '=== Lowest land sample ratios (top 20) ==='
+SELECT
+    z,
+    x,
+    y,
+    tile_class,
+    land_sample_count,
+    ROUND(land_sample_ratio::numeric, 4) AS land_sample_ratio,
+    ROUND(country_overlap_ratio::numeric, 4) AS country_overlap_ratio
+FROM demo.tiles_z14
+WHERE country_id = :id
+ORDER BY land_sample_ratio ASC, x ASC, y ASC
+LIMIT 20;
+
 \echo '=== Largest fallback distances (top 20) ==='
 SELECT
     tc.z,
@@ -41,11 +65,14 @@ WHERE tc.country_id = :id
 ORDER BY tc.distance_m DESC
 LIMIT 20;
 
-\echo '=== Border tile spot-check sample (20 rows) ==='
+\echo '=== Landmask-influenced tile sample (20 rows) ==='
 SELECT
     t.z,
     t.x,
     t.y,
+    t.tile_class,
+    t.land_sample_count,
+    ROUND(t.land_sample_ratio::numeric, 4) AS land_sample_ratio,
     tc.city_name,
     tc.place_type,
     ROUND(tc.distance_m)::bigint AS distance_m,
@@ -56,9 +83,7 @@ JOIN demo.tile_city_z14 tc
  AND tc.z = t.z
  AND tc.x = t.x
  AND tc.y = t.y
-JOIN demo.countries cb
-  ON cb.id = t.country_id
 WHERE t.country_id = :id
-  AND ST_DWithin(t.geom, cb.geom, 50)
-ORDER BY t.x, t.y
+  AND t.land_sample_count < 5
+ORDER BY t.land_sample_ratio ASC, t.x, t.y
 LIMIT 20;

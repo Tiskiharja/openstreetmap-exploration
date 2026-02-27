@@ -43,12 +43,49 @@ CREATE TABLE IF NOT EXISTS demo.tiles_z14 (
     y int NOT NULL,
     geom geometry(Polygon, 3857) NOT NULL,
     centroid geometry(Point, 3857) NOT NULL,
+    is_boundary_tile boolean NOT NULL DEFAULT false,
+    country_overlap_ratio double precision NOT NULL DEFAULT 1.0,
+    land_sample_count smallint NOT NULL DEFAULT 0,
+    land_sample_ratio double precision NOT NULL DEFAULT 0.0,
+    tile_class text NOT NULL DEFAULT 'interior_land',
     PRIMARY KEY (country_id, z, x, y)
 );
+
+ALTER TABLE demo.tiles_z14
+    ADD COLUMN IF NOT EXISTS is_boundary_tile boolean NOT NULL DEFAULT false;
+
+ALTER TABLE demo.tiles_z14
+    ADD COLUMN IF NOT EXISTS country_overlap_ratio double precision NOT NULL DEFAULT 1.0;
+
+ALTER TABLE demo.tiles_z14
+    ADD COLUMN IF NOT EXISTS land_sample_count smallint NOT NULL DEFAULT 0;
+
+ALTER TABLE demo.tiles_z14
+    ADD COLUMN IF NOT EXISTS land_sample_ratio double precision NOT NULL DEFAULT 0.0;
+
+ALTER TABLE demo.tiles_z14
+    ADD COLUMN IF NOT EXISTS tile_class text NOT NULL DEFAULT 'interior_land';
+
+ALTER TABLE demo.tiles_z14
+    DROP COLUMN IF EXISTS water_sample_count;
+
+ALTER TABLE demo.tiles_z14
+    DROP COLUMN IF EXISTS water_sample_ratio;
 
 CREATE INDEX IF NOT EXISTS tiles_z14_geom_gix ON demo.tiles_z14 USING GIST (geom);
 CREATE INDEX IF NOT EXISTS tiles_z14_centroid_gix ON demo.tiles_z14 USING GIST (centroid);
 CREATE INDEX IF NOT EXISTS tiles_z14_country_idx ON demo.tiles_z14 (country_id);
+
+CREATE TABLE IF NOT EXISTS demo.global_land_polygons (
+    id bigserial PRIMARY KEY,
+    source_name text NOT NULL,
+    source_version text,
+    geom geometry(MultiPolygon, 3857) NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS global_land_polygons_geom_gix
+    ON demo.global_land_polygons
+    USING GIST (geom);
 
 CREATE TABLE IF NOT EXISTS demo.tile_city_z14 (
     country_id bigint NOT NULL REFERENCES demo.countries(id) ON DELETE CASCADE,

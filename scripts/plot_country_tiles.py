@@ -64,7 +64,7 @@ def compute_bounds(features: list[dict]) -> tuple[float, float, float, float] | 
 def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
     sql = """
         WITH target_country AS (
-            SELECT id, geom
+            SELECT id
             FROM demo.countries
             WHERE name ILIKE %(country_name)s
             LIMIT 1
@@ -76,6 +76,11 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
             tc.city_name,
             tc.place_type,
             tc.assignment_method,
+            t.tile_class,
+            t.is_boundary_tile,
+            t.land_sample_count,
+            t.land_sample_ratio,
+            t.country_overlap_ratio,
             ST_AsGeoJSON(ST_Transform(t.geom, 4326)) AS geom_geojson
         FROM demo.tiles_z14 t
         JOIN demo.tile_city_z14 tc
@@ -85,7 +90,6 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
          AND tc.y = t.y
         JOIN target_country c
           ON c.id = t.country_id
-         AND ST_Covers(c.geom, t.centroid)
         ORDER BY t.x, t.y
     """
     with conn.cursor() as cur:
@@ -93,7 +97,20 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
         rows = cur.fetchall()
 
     features: list[dict] = []
-    for z, x, y, city_name, place_type, assignment_method, geom_geojson in rows:
+    for (
+        z,
+        x,
+        y,
+        city_name,
+        place_type,
+        assignment_method,
+        tile_class,
+        is_boundary_tile,
+        land_sample_count,
+        land_sample_ratio,
+        country_overlap_ratio,
+        geom_geojson,
+    ) in rows:
         features.append(
             {
                 "type": "Feature",
@@ -104,6 +121,11 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
                     "city_name": city_name,
                     "place_type": place_type,
                     "assignment_method": assignment_method,
+                    "tile_class": tile_class,
+                    "is_boundary_tile": is_boundary_tile,
+                    "land_sample_count": land_sample_count,
+                    "land_sample_ratio": round(land_sample_ratio, 4),
+                    "country_overlap_ratio": round(country_overlap_ratio, 4),
                 },
                 "geometry": json.loads(geom_geojson),
             }
@@ -114,7 +136,7 @@ def fetch_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
 def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list[dict]:
     sql = """
         WITH target_country AS (
-            SELECT id, geom
+            SELECT id
             FROM demo.countries
             WHERE name ILIKE %(country_name)s
             LIMIT 1
@@ -124,7 +146,6 @@ def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list
             FROM demo.tiles_z14 t
             JOIN target_country c
               ON c.id = t.country_id
-             AND ST_Covers(c.geom, t.centroid)
         )
         SELECT ST_AsGeoJSON(
             ST_Transform(
@@ -148,13 +169,70 @@ def fetch_dissolved_feature(conn: psycopg.Connection, country_name: str) -> list
     ]
 
 
+def fetch_dissolved_class_features(conn: psycopg.Connection, country_name: str) -> list[dict]:
+    sql = """
+        WITH target_country AS (
+            SELECT id
+            FROM demo.countries
+            WHERE name ILIKE %(country_name)s
+            LIMIT 1
+        ),
+        class_tiles AS (
+            SELECT
+                t.tile_class,
+                COUNT(*) AS tile_count,
+                AVG(t.land_sample_ratio) AS avg_land_sample_ratio,
+                ST_UnaryUnion(ST_Collect(t.geom)) AS geom
+            FROM demo.tiles_z14 t
+            JOIN target_country c
+              ON c.id = t.country_id
+            GROUP BY t.tile_class
+        )
+        SELECT
+            tile_class,
+            tile_count,
+            avg_land_sample_ratio,
+            ST_AsGeoJSON(ST_Transform(geom, 4326)) AS geom_geojson
+        FROM class_tiles
+        ORDER BY tile_class
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, {"country_name": country_name})
+        rows = cur.fetchall()
+
+    features: list[dict] = []
+    for tile_class, tile_count, avg_land_sample_ratio, geom_geojson in rows:
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {
+                    "tile_class": tile_class,
+                    "tile_count": tile_count,
+                    "avg_land_sample_ratio": round(avg_land_sample_ratio, 4),
+                },
+                "geometry": json.loads(geom_geojson),
+            }
+        )
+    return features
+
+
 def build_map(
     features: list[dict],
     bounds: tuple[float, float, float, float] | None,
     fill_color: str,
     fill_opacity: float,
+    color_by: str,
+    tooltip_fields: list[str] | None,
+    tooltip_aliases: list[str] | None,
     show_tooltip: bool,
 ) -> folium.Map:
+    class_colors = {
+        "interior_land": "#2a9d8f",
+        "land_dominant": "#8ab17d",
+        "coastal_mixed": "#e9c46a",
+        "water_dominant": "#457b9d",
+    }
+
     if bounds is not None:
         min_lon, min_lat, max_lon, max_lat = bounds
         center = [(min_lat + max_lat) / 2.0, (min_lon + max_lon) / 2.0]
@@ -165,16 +243,20 @@ def build_map(
     geojson = {"type": "FeatureCollection", "features": features}
 
     tooltip = None
-    if show_tooltip:
+    if show_tooltip and tooltip_fields and tooltip_aliases:
         tooltip = folium.GeoJsonTooltip(
-            fields=["city_name", "place_type", "assignment_method", "z", "x", "y"],
-            aliases=["Assigned city", "Place type", "Method", "Z", "X", "Y"],
+            fields=tooltip_fields,
+            aliases=tooltip_aliases,
         )
 
     layer = folium.GeoJson(
         data=geojson,
-        style_function=lambda _: {
-            "fillColor": fill_color,
+        style_function=lambda feature: {
+            "fillColor": (
+                class_colors.get(feature["properties"].get("tile_class"), fill_color)
+                if color_by == "tile-class"
+                else fill_color
+            ),
             "color": "#111111",
             "fill": True,
             "weight": 0.15,
@@ -220,15 +302,21 @@ def parse_args() -> argparse.Namespace:
         help="Tile fill opacity in [0,1] (default: 0.45).",
     )
     parser.add_argument(
+        "--color-by",
+        choices=["tile-class", "uniform"],
+        default="tile-class",
+        help="Color tiles by tile_class or use one fill color (default: tile-class).",
+    )
+    parser.add_argument(
         "--dsn",
         default=None,
         help="Optional PostgreSQL DSN. If omitted, DB_* environment variables are used.",
     )
     parser.add_argument(
         "--mode",
-        choices=["tiles", "dissolved"],
+        choices=["tiles", "dissolved", "dissolved-by-class"],
         default="tiles",
-        help="Output mode: per-tile polygons (tiles) or one merged polygon (dissolved).",
+        help="Output mode: per-tile polygons, one merged polygon, or one dissolved polygon per tile_class.",
     )
     return parser.parse_args()
 
@@ -247,8 +335,40 @@ def main() -> int:
     with conn_ctx as conn:
         if args.mode == "dissolved":
             features = fetch_dissolved_feature(conn, country_name=args.country_name)
+            tooltip_fields = ["country_name"]
+            tooltip_aliases = ["Country"]
+        elif args.mode == "dissolved-by-class":
+            features = fetch_dissolved_class_features(conn, country_name=args.country_name)
+            tooltip_fields = ["tile_class", "tile_count", "avg_land_sample_ratio"]
+            tooltip_aliases = ["Tile class", "Tile count", "Avg land ratio"]
         else:
             features = fetch_features(conn, country_name=args.country_name)
+            tooltip_fields = [
+                "tile_class",
+                "land_sample_count",
+                "land_sample_ratio",
+                "country_overlap_ratio",
+                "is_boundary_tile",
+                "city_name",
+                "place_type",
+                "assignment_method",
+                "z",
+                "x",
+                "y",
+            ]
+            tooltip_aliases = [
+                "Tile class",
+                "Land samples",
+                "Land sample ratio",
+                "Country overlap ratio",
+                "Boundary tile",
+                "Assigned city",
+                "Place type",
+                "Method",
+                "Z",
+                "X",
+                "Y",
+            ]
         if not features:
             raise RuntimeError(
                 f"No tiles found for country_name={args.country_name!r} in demo.countries/demo.tiles_z14."
@@ -260,7 +380,10 @@ def main() -> int:
         bounds=bounds,
         fill_color=args.fill_color,
         fill_opacity=args.fill_opacity,
-        show_tooltip=(args.mode == "tiles"),
+        color_by=args.color_by,
+        tooltip_fields=tooltip_fields,
+        tooltip_aliases=tooltip_aliases,
+        show_tooltip=True,
     )
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     m.save(args.output)
