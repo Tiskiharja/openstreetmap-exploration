@@ -9,7 +9,9 @@ Code in this repo is mostly vibe-coded. The goal has been for me to get familiar
 - [Docs hub](data/index.html)
 - [Area analysis summary](AREA_ANALYSIS.md)
 - [Finland tiles](data/finland_tiles_dissolved.html)
+- [Finland landmask tiles](data/finland_tiles_classified_dissolved_osmdata_landmask.html)
 - [France tiles](data/france_tiles_dissolved.html)
+- [France landmask tiles](data/france_tiles_classified_dissolved_osmdata_landmask.html)
 - [Hungary tiles](data/hungary_tiles_dissolved.html)
 - [Helsinki / Espoo / Vantaa tiles](data/helsinki_espoo_vantaa_tiles.html)
 
@@ -33,6 +35,7 @@ The pipeline is platform-agnostic and can run on macOS or Linux as long as these
 - `COUNTRY_SLUG=finland`
 - `FALLBACK_RADIUS_M=7000`
 - `PBF_PATH=data/finland-latest.osm.pbf`
+- `LANDMASK_PROVIDER=osmdata`
 
 ## One-time setup
 
@@ -62,21 +65,14 @@ Notes:
 - Natural Earth `ne_10m_land` remains available as a fallback via `LANDMASK_PROVIDER=natural-earth`.
 - The landmask import skips work if the pinned source/version is already loaded.
 
-## Run For France
-
-One-command shortcut:
+Country variants:
 
 ```bash
 make france
-```
-
-Equivalent explicit command:
-
-```bash
 make all COUNTRY_NAME=France COUNTRY_SLUG=france
 ```
 
-This uses:
+France uses:
 - `PBF_URL=https://download.geofabrik.de/europe/france-latest.osm.pbf`
 - `PBF_PATH=data/france-latest.osm.pbf`
 
@@ -105,21 +101,13 @@ This uses:
 2. Nearest to tile centroid within radius: lowest `place_rank`, shortest distance, highest `population`, lowest `osm_id`
 3. Safety fallback: nearest globally with same ordering (guarantees one row per tile)
 
-## Useful targets
+## Common targets
 
-- `make db-init`
-- `make landmask-download`
-- `make landmask-download-osmdata`
-- `make landmask-download-natural-earth`
-- `make landmask-import`
-- `make landmask-import-osmdata`
-- `make landmask-import-natural-earth`
-- `make import`
-- `make sql-all`
-- `make build-country-landmask`
-- `make area-summary`
-- `make area-summary-geodesic`
-- `make validate`
+- `make db-init`, `make import`, `make sql-all`, `make validate`
+- `make landmask-download`, `make landmask-import`, `make build-country-landmask`
+- `make landmask-download-osmdata`, `make landmask-import-osmdata`
+- `make landmask-download-natural-earth`, `make landmask-import-natural-earth`
+- `make area-summary`, `make area-summary-geodesic`
 - `uv run osm-tile-pipeline run build-tiles`
 
 ## Country tile area summary
@@ -148,6 +136,10 @@ This creates materialized view `demo.country_tile_area_summary_geodesic` with:
 - `tile_scope`: `all_tiles` or `non_water_tiles`
 - `area_m2_from_full_tiles_geodesic`: sum of full tile geodesic areas
 - `area_m2_from_clipped_tiles_geodesic`: sum of tile-country intersections as geodesic area
+
+Current analysis is summarized in [AREA_ANALYSIS.md](AREA_ANALYSIS.md). The latest landmask-based validation runs showed:
+- Finland: `391,101.129 km²` geodesic clipped area for `all_tiles`, `344,356.151 km²` for `non_water_tiles`
+- France: `602,776.262 km²` geodesic clipped area for `all_tiles`, `543,079.552 km²` for `non_water_tiles`
 
 ## Visualize Helsinki/Espoo/Vantaa tiles
 
@@ -179,3 +171,7 @@ For a much smaller classified output, dissolve tiles into one geometry per `tile
 ```bash
 uv run python scripts/plot_country_tiles.py --country-name "Suomi / Finland" --mode dissolved-by-class --output data/finland_tiles_classified_dissolved.html
 ```
+
+Landmask classification examples already published in `data/`:
+- Finland: [data/finland_tiles_classified_dissolved_osmdata_landmask.html](data/finland_tiles_classified_dissolved_osmdata_landmask.html)
+- France: [data/france_tiles_classified_dissolved_osmdata_landmask.html](data/france_tiles_classified_dissolved_osmdata_landmask.html)
