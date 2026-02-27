@@ -131,6 +131,7 @@ make area-summary
 ```
 
 This creates materialized view `demo.country_tile_area_summary` with:
+- `tile_scope`: `all_tiles` or `non_water_tiles` (`interior_land`, `land_dominant`, `coastal_mixed`)
 - `tile_edge_m`: z14 tile edge length in projected meters (Web Mercator world width / `2^14`)
 - `tile_count`: number of tiles intersecting the country
 - `area_m2_by_constant_tile_size_projected`: `tile_count * tile_edge_m^2` (rough projected estimate)
@@ -144,6 +145,7 @@ make area-summary-geodesic
 ```
 
 This creates materialized view `demo.country_tile_area_summary_geodesic` with:
+- `tile_scope`: `all_tiles` or `non_water_tiles`
 - `area_m2_from_full_tiles_geodesic`: sum of full tile geodesic areas
 - `area_m2_from_clipped_tiles_geodesic`: sum of tile-country intersections as geodesic area
 

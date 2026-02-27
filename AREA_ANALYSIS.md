@@ -6,6 +6,10 @@ Generated on: 2026-02-19
 
 ### Projected clipped area (`demo.country_tile_area_summary`)
 
+Includes one row per country and `tile_scope`:
+- `all_tiles`
+- `non_water_tiles`
+
 | Country | Tile count | Clipped area (km², projected) |
 |---|---:|---:|
 | Finland | 348,733 | 2,072,027.515 |
@@ -13,6 +17,10 @@ Generated on: 2026-02-19
 | Hungary | 34,349 | 201,175.473 |
 
 ### Geodesic clipped area (`demo.country_tile_area_summary_geodesic`)
+
+Includes one row per country and `tile_scope`:
+- `all_tiles`
+- `non_water_tiles`
 
 | Country | Tile count | Clipped area (km², geodesic) |
 |---|---:|---:|
